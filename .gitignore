@@ -1,0 +1,16 @@
+#clion
+.idea/
+CMakeLists.txt
+cmake-build-debug/
+
+#data
+Tyingli1.txt
+Tzaihe1.txt
+yingliK.txt
+aa.txt
+
+#code
+gaDemo
+gaTest.c
+main.c
+test.cu
