@@ -1,5 +1,6 @@
 #include<stdio.h>
 #include<stdlib.h>
+#include<string.h>
 #include<math.h>
 #include<time.h> 
 #include<stdbool.h>
@@ -246,10 +247,13 @@ float **rainFlow(float *ext, float *exttime, int lenOfSig2ext, int *lenOfRainflo
     }
 
     int columnId = 0;
+    int pointId = 0;
 
     for (int i = 0; i < lenOfSig2ext; i++) {
-        a[++j] = *(ext + 1);
-        t[j] = *(exttime + 1);
+        a[++j] = *(ext + pointId);
+        //printf("%f\n", *(ext + pointId));
+        t[j] = *(exttime + pointId);
+        //printf("%f\n", *(exttime + pointId));
         while ((j >= 2) && (fabs(a[j - 1] - a[j - 2]) <= fabs(a[j] - a[j - 1]))) {
             ampl = fabs((a[j - 1] - a[j - 2]) / 2);
             switch (j) {
@@ -276,11 +280,11 @@ float **rainFlow(float *ext, float *exttime, int lenOfSig2ext, int *lenOfRainflo
                         *(*(rfy + 4) + columnId) = period;
                         columnId++;
                     }
-                    printf("%f\n", *(*(rfy + 0) + columnId));
-                    printf("%f\n", *(*(rfy + 1) + columnId));
-                    printf("%f\n", *(*(rfy + 2) + columnId));
-                    printf("%f\n", *(*(rfy + 3) + columnId));
-                    printf("%f\n", *(*(rfy + 4) + columnId));
+//                    printf("%f\n", *(*(rfy + 0) + columnId));
+//                    printf("%f\n", *(*(rfy + 1) + columnId));
+//                    printf("%f\n", *(*(rfy + 2) + columnId));
+//                    printf("%f\n", *(*(rfy + 3) + columnId));
+//                    printf("%f\n", *(*(rfy + 4) + columnId));
                     break;
                 }
                 default: {
@@ -303,13 +307,14 @@ float **rainFlow(float *ext, float *exttime, int lenOfSig2ext, int *lenOfRainflo
                 }
             }
         }
+        pointId++;
     }
     for (int i = 0; i < j; i++) {
         ampl = fabs(a[i] - a[i + 1]) / 2;
         mean = (a[i] + a[i + 1]) / 2;
         period = (t[i + 1] - t[i]) * 2;
         atime = t[i];
-        if (ampl > 0){
+        if (ampl > 0) {
             *(*(rfy + 0) + columnId) = ampl;
             *(*(rfy + 1) + columnId) = mean;
             *(*(rfy + 2) + columnId) = 0.50;
@@ -326,12 +331,105 @@ float **rainFlow(float *ext, float *exttime, int lenOfSig2ext, int *lenOfRainflo
     }
     *lenOfRainflow = lenOfSig2ext - cNr;
 
-    for(int i = 0; i < 5; i++){
-        for(int k = 0; k < lenOfSig2ext - cNr; k++){
+    for (int i = 0; i < 5; i++) {
+        for (int k = 0; k < lenOfSig2ext - cNr; k++) {
             rfyResult[i][k] = rfy[i][k];
         }
     }
     return rfyResult;
+}
+
+//hist in rfhist
+float *hist(float *rf, int lenOfRfhist, int x){
+    float *noy, *xoy;
+
+    xoy = malloc(x * sizeof(float));
+    noy = malloc(x * sizeof(float));
+    memset(noy, 0, sizeof(noy));
+
+    float min = rf[0], max = rf[0];
+    for (int i = 0; i < lenOfRfhist; i++) {
+        if (rf[i] >= max) {
+            max = rf[i];
+        } else if (rf[i] <= min) {
+            min = rf[i];
+        }
+    }
+    float wid = (max - min) / x;
+    for (int i = 0; i < x; i++) {
+        xoy[i] = min + (float) (i + 0.50) * wid;
+    }
+
+    for (int i = 0; i < lenOfRfhist; i++) {
+        int j;
+        j = (int) floor((rf[i] - min) / wid);
+        if (j == x) {
+            noy[j - 1] += 1.00;
+        } else {
+            noy[j] += 1.00;
+        }
+    }
+
+    float *hist = malloc(2 * x * sizeof(float));
+    for(int i = 0; i < x; i++){
+        hist[i] = noy[i];
+        hist[i + x] = xoy[i];
+    }
+
+    return hist;
+}
+
+//rfhist in rainflow
+float *rfhist(float **rfy, int lenOfRainflow, int *lenOfRfhist) {
+    float *noy = NULL, *xoy = NULL;
+    int x = 32;
+    *lenOfRfhist = x;
+
+    //halfc=find(rfy(3,:)==0.5)
+    int halfcNum = 0;
+    for (int i = 0; i < lenOfRainflow; i++) {
+        if (rfy[2][i] == 0.50)
+            halfcNum++;
+    }
+
+    int *halfc = NULL;
+    halfc = malloc(halfcNum * sizeof(int));
+    for (int i = 0, j = 0; i < lenOfRainflow && j < halfcNum;) {
+        if (rfy[2][i] == 0.50) {
+            halfc[j] = i;
+            j++;
+        }
+        i++;
+    }
+
+    //[N1 x]=hist(rfy(r,:),x)     r = 1, x = *xoy, N1 = *noy
+    noy = hist(*rfy, lenOfRainflow, x);
+    xoy = noy + x;
+
+    //if ~isempty(halfc) {
+    //[N2 x]=hist(rf(r,halfc),x)  N2 = noy2, x = *xoy
+    //N1=N1-0.5*N2  N1 = noy
+    // }
+    if(halfcNum != 0){
+        float *noy2 = NULL;
+        float *rf = malloc(halfcNum * sizeof(float));
+        for(int i = 0; i < halfcNum; i++){
+            int j = halfc[i];
+            rf[i] = rfy[0][j];
+        }
+        noy2 = hist(rf, halfcNum, x);
+        for(int i = 0; i < x; i++){
+            noy[i] -= noy2[i] * 0.5;
+        }
+    }
+
+    float *rfhist = malloc(2 * x * sizeof(float));
+    for(int i = 0; i < x; i++){
+        rfhist[i] = noy[i];
+        rfhist[i + x] = xoy[i];
+    }
+
+    return rfhist;
 }
 
 //test preData
@@ -350,17 +448,13 @@ void testPreData() {
 
     float **rfy = NULL;
     int lenOfRainflow;
-
     rfy = rainFlow(ext, exttime, lenOfSig2ext, &lenOfRainflow);
 
-    printf("%d\n", lenOfRainflow);
-//    for(int i = 0; i < 5; i++){
-//        for(int j = 0; j < lenOfRainflow; j++){
-//            printf("%f ", rfy[i][j]);
-//        }
-//    }
 
-
+    float *noy = NULL, *xoy = NULL;
+    int lenOfRfhist;
+    noy = rfhist(rfy, lenOfRainflow, &lenOfRfhist);
+    xoy = noy + lenOfRfhist;
 }
 
 
