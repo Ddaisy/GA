@@ -2,38 +2,41 @@
 #include<stdlib.h>
 #include<string.h>
 #include<math.h>
-#include<time.h> 
-#include<stdbool.h>
+#include<time.h>
 
+
+#define BOOL int
+#define TRUE 1
+#define FALSE 0
 #define populationSize 100
 #define chromosomeSize 10
 #define maxGeneration 500
 #define crossRate 0.8
-#define mutationRate 0.05
+#define mutationRate 0.01
 #define eliteCount 0.05*populationSize
+
 
 typedef double FLOAT;
 
 FLOAT LB[10] = {0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5}; //lower bound
 FLOAT UB[10] = {5, 4, 5, 4, 5, 5, 5, 5, 5, 4}; //upper bound
-FLOAT **a;
-FLOAT **aa;
-FLOAT **aaa;
+FLOAT **a;  //Tzaihe
+FLOAT **aa;  //yingliK
+FLOAT **aaa; //Tyingli
 int aRow;
 int aaaRow;
 FLOAT Dysum[9];
 FLOAT Dzsum[9];
 FLOAT populationArray[populationSize][chromosomeSize];  //种群数组
 FLOAT fitness[populationSize]; //每个种群的适应度
+FLOAT populationPro[populationSize]; //每个种群在select时被选中的概率
 FLOAT bestFitnessOfGen; //每一代的最优适应度
 int bestIndexOfGen; //每一代的最优适应度位置
 FLOAT aveFitnessOfGen[maxGeneration]; //每一代的平均最优适应度
 FLOAT X_10[chromosomeSize]; //最优适应度对应的x值
 FLOAT fval; //最终最优适应度
 int G; //取得最终最优适应度的迭代次数
-
-
-
+BOOL elitism = TRUE; //是否精英选择
 
 
 FLOAT **createMatrix(int rows, int cols) {
@@ -52,13 +55,13 @@ void freeMatrix(FLOAT **matrix, int rows) {
 }
 
 //Get data from files
-bool getData(const char *fileName, FLOAT **x, int rows, int cols) {
+BOOL getData(const char *fileName, FLOAT **x, int rows, int cols) {
     // open file to read data
     FILE *fp;
     fp = fopen(fileName, "r");
     if (fp == NULL) {
         printf("Open file %s error!!\n", fileName);
-        return false;
+        return FALSE;
     }
 
     // read data
@@ -67,7 +70,7 @@ bool getData(const char *fileName, FLOAT **x, int rows, int cols) {
             fscanf(fp, "%lf", &*(*(x + i) + j));
         }
     }
-    return true;
+    return TRUE;
 }
 
 //sig2ext in rainflow
@@ -535,112 +538,109 @@ void testPreData() {
         ext = sig2ext(sigy, dty, aaaRow, &lenOfSig2ext);
         exttime = ext + lenOfSig2ext;
 
-//    for (int i = 0; i < lenOfSig2ext; i++) {
-//        printf("%.10f\n", ext[i]);
-//    }
-//    printf("\n");
-//    for (int i = 0; i < lenOfSig2ext; i++) {
-//        printf("%.10f\n", exttime[i]);
-//    }
-//    printf("\n");
-
         FLOAT **rfy = NULL;
         int lenOfRainflow;
         rfy = rainFlow(ext, exttime, lenOfSig2ext, &lenOfRainflow);
-
-//    for (int i = 0; i < 5; i++) {
-//        for (int j = 0; j < lenOfRainflow; j++) {
-//            printf("%.10f\n", rfy[i][j]);
-//        }
-//    }
-//    printf("\n");
-
 
         FLOAT *noy = NULL, *xoy = NULL;
         int lenOfRfhist;
         noy = rfhist(rfy, lenOfRainflow, &lenOfRfhist);
         xoy = noy + lenOfRfhist;
 
-//
-//    for (int i = 0; i < lenOfRfhist; i++) {
-//        printf("%.10f\n", noy[i]);
-//    }
-//    printf("\n");
-//    for (int i = 0; i < lenOfRfhist; i++) {
-//        printf("%.10f\n", xoy[i]);
-//    }
-//    printf("\n");
-
         for (int i = 0; i < lenOfRfhist; i++) {
             Dysum[kk] += noy[i] * pow(xoy[i] * 0.21 / 70, 3.5);
         }
         //printf("%e\n", Dysum[kk]);
+
+        free(ext);
+        for (int i = 0; i < 5; i++) {
+            free(rfy[i]);
+        }
+        free(rfy);
+        free(noy);
     }
 
 
     //test calculate Dzsum & y
 
-    /*
-    FLOAT **Tzb= NULL;
-    //create 2D Tzb(aRow * 9)
-    Tzb = (FLOAT **) malloc(aRow * sizeof(FLOAT *));
-    for (int i = 0; i < aRow; i++) {
-        Tzb[i] = (FLOAT *) malloc(9 * sizeof(FLOAT));
-    }
+//    printf("*************************Dzsum:***************************************\n");
+//    FLOAT **Tzb= NULL;
+//    //create 2D Tzb(aRow * 9)
+//    Tzb = (FLOAT **) malloc(aRow * sizeof(FLOAT *));
+//    for (int i = 0; i < aRow; i++) {
+//        Tzb[i] = (FLOAT *) malloc(9 * sizeof(FLOAT));
+//    }
+//
+//    for (int i = 0; i < 9; i++) {
+//        for (int j = 0; j < 150; j++) {
+//            //0.7812*aa(1,i)*a(j,3)+4.0000*aa(2,i)*a(j,4)+0.5029*aa(3,i)*a(j,5)+4.0000*aa(4,i)*a(j,6)+3.1156*aa(5,i)*a(j,7)+0.5011*aa(6,i)*a(j,8)+1.4676*aa(7,i)*a(j,9)+0.6966*aa(8,i)*a(j,10)+4.9997*aa(9,i)*a(j,11)+4.0000*aa(10,i)*a(j,12)
+////            Tzb[j][i] = 0.7812 * aa[0][i] * a[j][2] + 4.0000 * aa[1][i] * a[j][3] + 0.5029 * aa[2][i] * a[j][4] +
+////                        4.0000 * aa[3][i] * a[j][5] + 3.1156 * aa[4][i] * a[j][6] + 0.5011 * aa[5][i] * a[j][7] +
+////                        1.4676 * aa[6][i] * a[j][8] + 0.6966 * aa[7][i] * a[j][9] + 4.9997 * aa[8][i] * a[j][10] +
+////                        4.0000 * aa[9][i] * a[j][11];
+//            Tzb[j][i] = x[0] * aa[0][i] * a[j][2] + x[1] * aa[1][i] * a[j][3] + x[2] * aa[2][i] * a[j][4] +
+//                        x[3] * aa[3][i] * a[j][5] + x[4] * aa[4][i] * a[j][6] + x[5] * aa[5][i] * a[j][7] +
+//                        x[6] * aa[6][i] * a[j][8] + x[7] * aa[7][i] * a[j][9] + x[8] * aa[8][i] * a[j][10] +
+//                        x[9] * aa[9][i] * a[j][11];
+//        }
+//    }
+//
+//
+//    memset(Dzsum, 0, sizeof(FLOAT) * 9);
+//
+//    for (int k = 0; k < 9; k++) {
+//
+//        FLOAT sig[aRow], dt[aRow];
+//        for (int i = 0; i < aRow; i++) {
+//            sig[i] = Tzb[i][k];
+//            dt[i] = a[i][1];
+//        }
+//
+//        FLOAT *ext2 = NULL, *exttime2 = NULL;
+//        int lenOfSig2ext;
+//        ext2 = sig2ext(sig, dt, aRow, &lenOfSig2ext);
+//        exttime2 = ext2 + lenOfSig2ext;
+//
+//        FLOAT **rf = NULL;
+//        int lenOfRainflow;
+//        rf = rainFlow(ext2, exttime2, lenOfSig2ext, &lenOfRainflow);
+//
+//        FLOAT *no = NULL, *xo = NULL;
+//        int lenOfRfhist;
+//        no = rfhist(rf, lenOfRainflow, &lenOfRfhist);
+//        xo = no + lenOfRfhist;
+//
+//        for (int i = 0; i < lenOfRfhist; i++) {
+//            Dzsum[k] += no[i] * pow(xo[i] * 0.21 / 70, 3.5);
+//        }
+//        printf("%e\n", Dzsum[k]);
+//
+//        free(ext2);
+//        for(int i = 0; i < 5; i++){
+//            free(rf[i]);
+//        }
+//        free(rf);
+//        free(no);
+//    }
+//
+//    for(int i = 0; i < 9; i++){
+//        free(Tzb[i]);
+//    }
+//    free(Tzb);
+//
+//    FLOAT y = 0;
+//    for(int i = 0; i < 9; i++){
+//        y += pow((Dysum[i] - Dzsum[i]), 2);
+//    }
+//    printf("FitnessFCN:%e\n", y);
 
-    for (int i = 0; i < 9; i++) {
-        for (int j = 0; j < 150; j++) {
-            //0.7812*aa(1,i)*a(j,3)+4.0000*aa(2,i)*a(j,4)+0.5029*aa(3,i)*a(j,5)+4.0000*aa(4,i)*a(j,6)+3.1156*aa(5,i)*a(j,7)+0.5011*aa(6,i)*a(j,8)+1.4676*aa(7,i)*a(j,9)+0.6966*aa(8,i)*a(j,10)+4.9997*aa(9,i)*a(j,11)+4.0000*aa(10,i)*a(j,12)
-            Tzb[j][i] = 0.7812 * aa[0][i] * a[j][2] + 4.0000 * aa[1][i] * a[j][3] + 0.5029 * aa[2][i] * a[j][4] +
-                        4.0000 * aa[3][i] * a[j][5] + 3.1156 * aa[4][i] * a[j][6] + 0.5011 * aa[5][i] * a[j][7] +
-                        1.4676 * aa[6][i] * a[j][8] + 0.6966 * aa[7][i] * a[j][9] + 4.9997 * aa[8][i] * a[j][10] +
-                        4.0000 * aa[9][i] * a[j][11];
-        }
-    }
-
-
-    FLOAT Dzsum[9] = {0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00};
-    printf("*************************Dzsum:***************************************\n");
-
-    for (int k = 0; k < 9; k++) {
-
-        FLOAT sig[aRow], dt[aRow];
-        for (int i = 0; i < aRow; i++) {
-            sig[i] = Tzb[i][k];
-            dt[i] = a[i][1];
-        }
-
-        FLOAT *ext2 = NULL, *exttime2 = NULL;
-        int lenOfSig2ext;
-        ext2 = sig2ext(sig, dt, aRow, &lenOfSig2ext);
-        exttime2 = ext2 + lenOfSig2ext;
-
-        FLOAT **rf = NULL;
-        int lenOfRainflow;
-        rf = rainFlow(ext2, exttime2, lenOfSig2ext, &lenOfRainflow);
-
-        FLOAT *no = NULL, *xo = NULL;
-        int lenOfRfhist;
-        no = rfhist(rf, lenOfRainflow, &lenOfRfhist);
-        xo = no + lenOfRfhist;
-
-        for (int i = 0; i < lenOfRfhist; i++) {
-            Dzsum[k] += no[i] * pow(xo[i] * 0.21 / 70, 3.5);
-        }
-        printf("%e\n", Dzsum[k]);
-    }
-
-    FLOAT y = 0;
-    for(int i = 0; i < 9; i++){
-        y += pow((Dysum[i] - Dzsum[i]), 2);
-    }
-    printf("FitnessFCN:%e\n", y);
-    */
 
 }
 
 //fitness Function
 FLOAT fitnessFcn(FLOAT *x) {
+
+    memset(Dzsum, 0, sizeof(FLOAT) * 9);
 
     FLOAT **Tzb = NULL;
     //create 2D Tzb(aRow * 9)
@@ -649,9 +649,8 @@ FLOAT fitnessFcn(FLOAT *x) {
         Tzb[i] = (FLOAT *) malloc(9 * sizeof(FLOAT));
     }
 
-    FLOAT y = 0;
     for (int i = 0; i < 9; i++) {
-        for (int j = 0; j < 150; j++) {
+        for (int j = 0; j < aRow; j++) {
             //Tzb(j,i)=x(1)*aa(1,i)*a(j,3)+x(2)*aa(2,i)*a(j,4)+x(3)*aa(3,i)*a(j,5)+x(4)*aa(4,i)*a(j,6)+x(5)*aa(5,i)*a(j,7)+x(6)*aa(6,i)*a(j,8)+x(7)*aa(7,i)*a(j,9)+x(8)*aa(8,i)*a(j,10)+x(9)*aa(9,i)*a(j,11)+x(10)*aa(10,i)*a(j,12);
             Tzb[j][i] = x[0] * aa[0][i] * a[j][2] + x[1] * aa[1][i] * a[j][3] + x[2] * aa[2][i] * a[j][4] +
                         x[3] * aa[3][i] * a[j][5] + x[4] * aa[4][i] * a[j][6] + x[5] * aa[5][i] * a[j][7] +
@@ -688,8 +687,16 @@ FLOAT fitnessFcn(FLOAT *x) {
             Dzsum[k] += no[i] * pow(xo[i] * 0.21 / 70, 3.5);
         }
         //printf("%e\n", Dzsum[k]);
+
+        free(ext);
+        for (int i = 0; i < 5; i++) {
+            free(rf[i]);
+        }
+        free(rf);
+        free(no);
     }
 
+    FLOAT y = 0;
     for (int i = 0; i < 9; i++) {
         //constraint : c =(Dysum[i]-Dzsum[i]) <= 0
         FLOAT c = Dysum[i] - Dzsum[i];
@@ -700,6 +707,11 @@ FLOAT fitnessFcn(FLOAT *x) {
         }
     }
 
+    for (int i = 0; i < 9; i++) {
+        free(Tzb[i]);
+    }
+    free(Tzb);
+
     return y;
 }
 
@@ -707,29 +719,44 @@ FLOAT fitnessFcn(FLOAT *x) {
 void initialPopulation() {
     for (int i = 0; i < populationSize; i++) {
         for (int j = 0; j < chromosomeSize; j++) {
-            populationArray[i][j] = (UB[j] - LB[j]) * ((FLOAT) rand() / RAND_MAX) + LB[j];
+            int high_pos = rand();
+            int low_pos = (rand() & ((1 << 16) - 1));
+            high_pos = (high_pos & ((1 << 15) - 1));
+            int value = low_pos + (high_pos << 16);
+            populationArray[i][j] = (UB[j] - LB[j]) * ((FLOAT) value / ((1U << 31) - 1)) + LB[j];
+//            printf("high %d low %d %d / %d\n", high_pos, low_pos, value, (1U << 31) - 1);
         }
+        FLOAT tmp_fit = fitnessFcn(populationArray[i]);
+        if (tmp_fit > 99) {
+            i--;
+        }
+//        else {
+//            for (int j = 0; j < chromosomeSize; j++) {
+//                printf("%f,", populationArray[i][j]);
+//            }
+//            printf("%e\n", tmp_fit);
+//        }
     }
 }
 
 //sum fitness
-FLOAT sum(FLOAT *fitness) {
+FLOAT sum(FLOAT *x) {
     FLOAT sum = 0;
     for (int i = 0; i < populationSize; i++) {
-        sum += fitness[i];
+        sum += x[i];
     }
     return sum;
 }
 
 //best fitness position
-FLOAT *bestFitness(FLOAT *fitness) {
+FLOAT *bestFitness() {
 
     //bestRes[bestFitness][bestIndex]
     FLOAT bestFitness = fitness[0];
     int bestIndex = 0;
     FLOAT *bestRes = malloc(2 * sizeof(FLOAT));
-    for(int i = 0; i < populationSize; i++){
-        if(fitness[i] < bestFitness){
+    for (int i = 0; i < populationSize; i++) {
+        if (fitness[i] < bestFitness) {
             bestFitness = fitness[i];
             bestIndex = i;
         }
@@ -741,7 +768,7 @@ FLOAT *bestFitness(FLOAT *fitness) {
 }
 
 //rank fitness
-int *rankForElitism(FLOAT *fitness) {
+int *rankForElitism() {
 
     // initialize rank array
     int *rank = malloc(populationSize * sizeof(int));
@@ -763,14 +790,133 @@ int *rankForElitism(FLOAT *fitness) {
     return rank;
 }
 
+//select function 轮盘选择
+void selectFcn() {
+
+    FLOAT tmpPopulationArray[populationSize][chromosomeSize];
+    FLOAT tmpFitness[populationSize];
+    //每个个体被选择的概率
+    FLOAT *Fitness = malloc(populationSize * sizeof(FLOAT));
+    FLOAT sumFitness = 0;
+
+    for (int i = 0; i < populationSize; i++) {
+        Fitness[i] = 1 / fitness[i];
+    }
+
+    sumFitness = sum(Fitness);
+    for (int i = 0; i < populationSize; i++) {
+        populationPro[i] = Fitness[i] / sumFitness;
+    }
+    free(Fitness);
+
+    //轮盘选择
+    int *index = malloc(populationSize * sizeof(int));
+    for (int i = 0; i < populationSize; i++) {
+        FLOAT pick = ((FLOAT) rand()) / RAND_MAX;
+        while (pick < 0.0001)
+            pick = ((FLOAT) rand()) / RAND_MAX;
+
+        for (int j = 0; j < populationSize; j++) {
+            pick -= populationPro[j];
+            if (pick <= 0) {
+                index[i] = j;
+                break;
+            }
+        }
+    }
+
+    //是否精英选择
+    int elitismSize = populationSize;
+    if (elitism == TRUE) {
+        int *rank;
+        rank = rankForElitism();
+        elitismSize = (int) (populationSize - eliteCount);
+
+        //在新种群的最后保留eliteCount个个体
+        for (int i = elitismSize, k = 0; i < populationSize && k < eliteCount; i++, k++) {
+            for (int j = 0; j < chromosomeSize; j++) {
+                tmpPopulationArray[i][j] = populationArray[rank[k]][j];
+            }
+            tmpFitness[i] = fitness[rank[k]];
+        }
+    }
+    for (int i = 0; i < elitismSize; i++) {
+        for (int j = 0; j < chromosomeSize; j++) {
+            tmpPopulationArray[i][j] = populationArray[index[i]][j];
+        }
+        tmpFitness[i] = fitness[index[i]];
+    }
+    free(index);
+
+    //产生新种群
+    for (int i = 0; i < populationSize; i++) {
+        for (int j = 0; j < chromosomeSize; j++) {
+            populationArray[i][j] = tmpPopulationArray[i][j];
+        }
+        fitness[i] = tmpFitness[i];
+    }
+}
+
+//cross function 每两个个体做判断
+void crossFcn() {
+    for (int i = 0; i < populationSize; i += 2) {
+        //判断当前两个个体是否做交叉
+        FLOAT pick1 = ((FLOAT) rand()) / RAND_MAX;
+        if (pick1 > crossRate)
+            continue;
+
+        for (int j = 0; j < chromosomeSize; j++) {
+            //判断两个个体中的染色体是否做交叉
+            int pick2 = rand();
+            if (pick2 & 1) {
+                FLOAT tmp = populationArray[i][j];
+                populationArray[i][j] = populationArray[i + 1][j];
+                populationArray[i + 1][j] = tmp;
+            }
+        }
+    }
+}
+
+//mutation function
+void mutationFcn() {
+    FLOAT scale = 0.5, shrink = 0.75;
+    for (int i = 0; i < populationSize; i++) {
+        scale -= scale * shrink * i / maxGeneration;
+
+        //判断当前个体是否变异
+        FLOAT pick1 = ((FLOAT) rand()) / RAND_MAX;
+        if (pick1 > mutationRate)
+            continue;
+
+        for (int j = 0; j < chromosomeSize; j++) {
+            //判断当前染色体是否变异
+            int pick2 = rand();
+            if (pick2 & 1) {
+                FLOAT tmpChromosome;
+                do {
+                    FLOAT pick3 = ((FLOAT) rand()) / RAND_MAX * 2 - 1;
+                    tmpChromosome = populationArray[i][j] + scale * (UB[j] - LB[j]) * pick3;
+                    //判断是否越界
+                } while (tmpChromosome > UB[j] || tmpChromosome < LB[j]);
+                populationArray[i][j] = tmpChromosome;
+            }
+        }
+    }
+}
+
 
 int main(int argc, char *argv[]) {
+
+    srand(time(NULL));
+
+    time_t start = clock();
+
     if (argc != 6) {
         printf("Error!\n");
         return 0;
     }
 
-    bool success = true;
+    BOOL success = TRUE;
 
     aRow = atoi(argv[2]);
     a = createMatrix(aRow, 16);
@@ -791,59 +937,77 @@ int main(int argc, char *argv[]) {
         return 0;
     }
 
+    //FLOAT x[10] = {0.721442,2.011512,3.811585,1.052325,1.571934,1.063318,3.603349,2.452343,3.628507,2.900026};
+
+
+
     //calculate Dysum
     testPreData();
 
     //initial population
     initialPopulation();
 
+    fval = 100;
 
     //start GA
-    //for maxGeneration
+    for (int i = 0; i < maxGeneration; i++) {
 
-
-
-    //calculate fitness of every population
-    for (int i = 0; i < populationSize; i++) {
-        fitness[i] = fitnessFcn(populationArray[i]);
-    }
-
-    //每一代平均最优适应度
-    FLOAT sumFit = sum(fitness);
-    aveFitnessOfGen[00000] = sumFit / populationSize;
-
-    //每一代最优适应度及其位置
-    //bestRes[bestFitness][bestIndex]
-    FLOAT *bestRes = bestFitness(fitness);
-    bestFitnessOfGen = bestRes[0];
-    bestIndexOfGen = (int)bestRes[1];
-
-    //找到最新最优适应度及其对应位置包含的x值
-    if(bestFitnessOfGen < fval){
-        fval = bestFitnessOfGen;
-        for(int i = 0; i < chromosomeSize; i++){
-            X_10[i] = populationArray[bestIndexOfGen][i];
+        //calculate fitness of every population
+        for (int j = 0; j < populationSize; j++) {
+            fitness[j] = fitnessFcn(populationArray[j]);
         }
-        G = 00000;
+
+//        if (i % 100 == 0) {
+//            printf("epoch %d :\n", i);
+//            for (int m = 0; m < populationSize; m++) {
+//                for (int n = 0; n < chromosomeSize; n++) {
+//                    printf("%f,", populationArray[m][n]);
+//                }
+//                printf("%e\n", fitness[m]);
+//            }
+//        }
+
+        //每一代平均适应度
+        FLOAT sumFit = sum(fitness);
+        aveFitnessOfGen[i] = sumFit / populationSize;
+
+        //每一代最优适应度及其位置
+        //bestRes[bestFitness][bestIndex]
+        FLOAT *bestRes = bestFitness();
+        bestFitnessOfGen = bestRes[0];
+        bestIndexOfGen = (int) bestRes[1];
+
+        //找到最新最优适应度及其对应位置包含的x值
+        if (bestFitnessOfGen < fval) {
+            fval = bestFitnessOfGen;
+            for (int k = 0; k < chromosomeSize; k++) {
+                X_10[k] = populationArray[bestIndexOfGen][k];
+            }
+            G = i + 1;
+        }
+
+        if (i == maxGeneration - 1) break;
+
+        //select
+        selectFcn();
+        //cross
+        crossFcn();
+        //mutation
+        mutationFcn();
     }
-
-    //if(i = maxGeneration - 1) break;
-
-    //select
-    selectFcn(populationArray);
-
-    //cross
-    crossFcn(populationArray);
-
-    //mutation
-    mutationFcn(populationArray);
-
-    //stop GA
-
 
     freeMatrix(a, aRow);
     freeMatrix(aa, 10);
     freeMatrix(aaa, aaaRow);
+
+    time_t stop = clock();
+    FLOAT time = ((FLOAT) (stop - start)) / CLOCKS_PER_SEC;
+
+    printf("fval:%e\n", fval);
+    printf("X:%f, %f, %f, %f, %f, %f, %f, %f, %f, %f\n", X_10[0], X_10[1], X_10[2], X_10[3], X_10[4], X_10[5], X_10[6],
+           X_10[7], X_10[8], X_10[9]);
+    printf("Gen:%d\n", G);
+    printf("%.2f\n", time);
 
     return 0;
 }
