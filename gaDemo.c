@@ -10,6 +10,7 @@
 #define maxGeneration 500
 #define crossRate 0.8
 #define mutationRate 0.05
+#define eliteCount 0.05*populationSize
 
 typedef double FLOAT;
 
@@ -21,6 +22,18 @@ FLOAT **aaa;
 int aRow;
 int aaaRow;
 FLOAT Dysum[9];
+FLOAT Dzsum[9];
+FLOAT populationArray[populationSize][chromosomeSize];  //种群数组
+FLOAT fitness[populationSize]; //每个种群的适应度
+FLOAT bestFitnessOfGen; //每一代的最优适应度
+int bestIndexOfGen; //每一代的最优适应度位置
+FLOAT aveFitnessOfGen[maxGeneration]; //每一代的平均最优适应度
+FLOAT X_10[chromosomeSize]; //最优适应度对应的x值
+FLOAT fval; //最终最优适应度
+int G; //取得最终最优适应度的迭代次数
+
+
+
 
 
 FLOAT **createMatrix(int rows, int cols) {
@@ -37,7 +50,6 @@ void freeMatrix(FLOAT **matrix, int rows) {
     }
     free(matrix);
 }
-
 
 //Get data from files
 bool getData(const char *fileName, FLOAT **x, int rows, int cols) {
@@ -508,11 +520,11 @@ FLOAT *rfhist(FLOAT **rfy, int lenOfRainflow, int *lenOfRfhist) {
 //test preData
 void testPreData() {
 
-    printf("*************************Dysum:***************************************\n");
-
+    //printf("*************************Dysum:***************************************\n");
     for (int kk = 0; kk < 9; kk++) {
-        //int kk = 7;
-        FLOAT sigy[aaaRow], dty[aaaRow];
+        //FLOAT sigy[aaaRow], dty[aaaRow];
+        FLOAT *sigy = malloc(aaaRow * sizeof(FLOAT));
+        FLOAT *dty = malloc(aaaRow * sizeof(FLOAT));
         for (int i = 0; i < aaaRow; i++) {
             sigy[i] = aaa[i][kk + 2];
             dty[i] = aaa[i][1];
@@ -562,11 +574,19 @@ void testPreData() {
         for (int i = 0; i < lenOfRfhist; i++) {
             Dysum[kk] += noy[i] * pow(xoy[i] * 0.21 / 70, 3.5);
         }
-        printf("%e\n", Dysum[kk]);
+        //printf("%e\n", Dysum[kk]);
     }
 
 
-    FLOAT Tzb[aRow][9];
+    //test calculate Dzsum & y
+
+    /*
+    FLOAT **Tzb= NULL;
+    //create 2D Tzb(aRow * 9)
+    Tzb = (FLOAT **) malloc(aRow * sizeof(FLOAT *));
+    for (int i = 0; i < aRow; i++) {
+        Tzb[i] = (FLOAT *) malloc(9 * sizeof(FLOAT));
+    }
 
     for (int i = 0; i < 9; i++) {
         for (int j = 0; j < 150; j++) {
@@ -609,6 +629,138 @@ void testPreData() {
         }
         printf("%e\n", Dzsum[k]);
     }
+
+    FLOAT y = 0;
+    for(int i = 0; i < 9; i++){
+        y += pow((Dysum[i] - Dzsum[i]), 2);
+    }
+    printf("FitnessFCN:%e\n", y);
+    */
+
+}
+
+//fitness Function
+FLOAT fitnessFcn(FLOAT *x) {
+
+    FLOAT **Tzb = NULL;
+    //create 2D Tzb(aRow * 9)
+    Tzb = (FLOAT **) malloc(aRow * sizeof(FLOAT *));
+    for (int i = 0; i < aRow; i++) {
+        Tzb[i] = (FLOAT *) malloc(9 * sizeof(FLOAT));
+    }
+
+    FLOAT y = 0;
+    for (int i = 0; i < 9; i++) {
+        for (int j = 0; j < 150; j++) {
+            //Tzb(j,i)=x(1)*aa(1,i)*a(j,3)+x(2)*aa(2,i)*a(j,4)+x(3)*aa(3,i)*a(j,5)+x(4)*aa(4,i)*a(j,6)+x(5)*aa(5,i)*a(j,7)+x(6)*aa(6,i)*a(j,8)+x(7)*aa(7,i)*a(j,9)+x(8)*aa(8,i)*a(j,10)+x(9)*aa(9,i)*a(j,11)+x(10)*aa(10,i)*a(j,12);
+            Tzb[j][i] = x[0] * aa[0][i] * a[j][2] + x[1] * aa[1][i] * a[j][3] + x[2] * aa[2][i] * a[j][4] +
+                        x[3] * aa[3][i] * a[j][5] + x[4] * aa[4][i] * a[j][6] + x[5] * aa[5][i] * a[j][7] +
+                        x[6] * aa[6][i] * a[j][8] + x[7] * aa[7][i] * a[j][9] + x[8] * aa[8][i] * a[j][10] +
+                        x[9] * aa[9][i] * a[j][11];
+        }
+    }
+
+    for (int k = 0; k < 9; k++) {
+
+        //FLOAT sig[aRow], dt[aRow];
+        FLOAT *sig = malloc(aRow * sizeof(FLOAT));
+        FLOAT *dt = malloc(aRow * sizeof(FLOAT));
+        for (int i = 0; i < aRow; i++) {
+            sig[i] = Tzb[i][k];
+            dt[i] = a[i][1];
+        }
+
+        FLOAT *ext = NULL, *exttime = NULL;
+        int lenOfSig2ext;
+        ext = sig2ext(sig, dt, aRow, &lenOfSig2ext);
+        exttime = ext + lenOfSig2ext;
+
+        FLOAT **rf = NULL;
+        int lenOfRainflow;
+        rf = rainFlow(ext, exttime, lenOfSig2ext, &lenOfRainflow);
+
+        FLOAT *no = NULL, *xo = NULL;
+        int lenOfRfhist;
+        no = rfhist(rf, lenOfRainflow, &lenOfRfhist);
+        xo = no + lenOfRfhist;
+
+        for (int i = 0; i < lenOfRfhist; i++) {
+            Dzsum[k] += no[i] * pow(xo[i] * 0.21 / 70, 3.5);
+        }
+        //printf("%e\n", Dzsum[k]);
+    }
+
+    for (int i = 0; i < 9; i++) {
+        //constraint : c =(Dysum[i]-Dzsum[i]) <= 0
+        FLOAT c = Dysum[i] - Dzsum[i];
+        if (c <= 0) {
+            y += pow(c, 2);
+        } else {
+            y = 100;
+        }
+    }
+
+    return y;
+}
+
+//initial population
+void initialPopulation() {
+    for (int i = 0; i < populationSize; i++) {
+        for (int j = 0; j < chromosomeSize; j++) {
+            populationArray[i][j] = (UB[j] - LB[j]) * ((FLOAT) rand() / RAND_MAX) + LB[j];
+        }
+    }
+}
+
+//sum fitness
+FLOAT sum(FLOAT *fitness) {
+    FLOAT sum = 0;
+    for (int i = 0; i < populationSize; i++) {
+        sum += fitness[i];
+    }
+    return sum;
+}
+
+//best fitness position
+FLOAT *bestFitness(FLOAT *fitness) {
+
+    //bestRes[bestFitness][bestIndex]
+    FLOAT bestFitness = fitness[0];
+    int bestIndex = 0;
+    FLOAT *bestRes = malloc(2 * sizeof(FLOAT));
+    for(int i = 0; i < populationSize; i++){
+        if(fitness[i] < bestFitness){
+            bestFitness = fitness[i];
+            bestIndex = i;
+        }
+    }
+    bestRes[0] = bestFitness;
+    bestRes[1] = bestIndex;
+
+    return bestRes;
+}
+
+//rank fitness
+int *rankForElitism(FLOAT *fitness) {
+
+    // initialize rank array
+    int *rank = malloc(populationSize * sizeof(int));
+    for (int i = 0; i < populationSize; i++) {
+        rank[i] = i;
+    }
+
+    // rank fitness in increase order
+    for (int i = populationSize - 1; i > 0; i--) {
+        for (int j = 0; j < i; j++) {
+            if (fitness[rank[j]] > fitness[rank[j + 1]]) {
+                int tmp_rank = rank[j];
+                rank[j] = rank[j + 1];
+                rank[j + 1] = tmp_rank;
+            }
+        }
+    }
+
+    return rank;
 }
 
 
@@ -639,12 +791,59 @@ int main(int argc, char *argv[]) {
         return 0;
     }
 
+    //calculate Dysum
     testPreData();
+
+    //initial population
+    initialPopulation();
+
+
+    //start GA
+    //for maxGeneration
+
+
+
+    //calculate fitness of every population
+    for (int i = 0; i < populationSize; i++) {
+        fitness[i] = fitnessFcn(populationArray[i]);
+    }
+
+    //每一代平均最优适应度
+    FLOAT sumFit = sum(fitness);
+    aveFitnessOfGen[00000] = sumFit / populationSize;
+
+    //每一代最优适应度及其位置
+    //bestRes[bestFitness][bestIndex]
+    FLOAT *bestRes = bestFitness(fitness);
+    bestFitnessOfGen = bestRes[0];
+    bestIndexOfGen = (int)bestRes[1];
+
+    //找到最新最优适应度及其对应位置包含的x值
+    if(bestFitnessOfGen < fval){
+        fval = bestFitnessOfGen;
+        for(int i = 0; i < chromosomeSize; i++){
+            X_10[i] = populationArray[bestIndexOfGen][i];
+        }
+        G = 00000;
+    }
+
+    //if(i = maxGeneration - 1) break;
+
+    //select
+    selectFcn(populationArray);
+
+    //cross
+    crossFcn(populationArray);
+
+    //mutation
+    mutationFcn(populationArray);
+
+    //stop GA
+
 
     freeMatrix(a, aRow);
     freeMatrix(aa, 10);
     freeMatrix(aaa, aaaRow);
-
 
     return 0;
 }
