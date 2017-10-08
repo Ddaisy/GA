@@ -76,31 +76,14 @@ BOOL getData(const char *fileName, FLOAT **x, int rows, int cols) {
 //sig2ext in rainflow
 FLOAT *sig2ext(FLOAT *sigy, FLOAT *dty, int rows, int *lenOfArray) {
 
-    //w1=diff(sig);
-    //w2=logical([1;(w1(1:end-1).*w1(2:end))<=0;1]);
-    //tmp1=(w1(1:end-1).*w1(2:end))<=0
-
-    //FLOAT w1[rows - 1], tmp1[rows - 2], w2[rows];
-    FLOAT *w = malloc((rows) * sizeof(FLOAT));
     int n = 0, m = 0, k = 0, l = 0;
 
-//    w2[0] = 1;
-//    w2[rows - 1] = 1;
-
+    //w=diff(sig);
+    //w=logical([1;(w(1:end-1).*w(2:end))<=0;1]);
+    FLOAT *w = malloc((rows) * sizeof(FLOAT));
     for (int i = 1; i < rows; i++) {
         w[i - 1] = sigy[i] - sigy[i - 1];
     }
-//    for (int i = 1; i < rows - 1; i++) {
-//        tmp1[i - 1] = w[i - 1] * w[i];
-//        if (tmp1[i - 1] <= 0) {
-//            tmp1[i - 1] = 1;
-//        } else {
-//            tmp1[i - 1] = 0;
-//            n++;
-//        }
-//        w2[i] = tmp1[i - 1];
-//    }
-
 
     for (int i = rows - 2; i > 0; i--) {
         FLOAT tmp = w[i] * w[i - 1];
@@ -113,9 +96,7 @@ FLOAT *sig2ext(FLOAT *sigy, FLOAT *dty, int rows, int *lenOfArray) {
     }
     w[0] = w[rows - 1] = 1;
 
-    //ext1=sigy(w2);	exttime1=dty(w2);
-    //FLOAT ext1[rows - n], exttime1[rows - n];
-
+    //ext=sigy(w);	exttime=dty(w);
     FLOAT *ext = malloc((rows - n) * sizeof(FLOAT));
     FLOAT *exttime = malloc((rows - n) * sizeof(FLOAT));
     for (int i = 0, j = 0; i < rows - n && j < rows;) {
@@ -129,25 +110,11 @@ FLOAT *sig2ext(FLOAT *sigy, FLOAT *dty, int rows, int *lenOfArray) {
         }
     }
 
-    //w3=diff(ext1); tmp2 = w3(1:end-1)==0 & w3(2:end)==0; w4=~logical([0; w3(1:end-1)==0 & w3(2:end)==0; 0]);
-    //FLOAT w3[rows - n - 1], tmp2[rows - n - 2], w4[rows - n];
-
-//    w4[0] = 1;
-//    w4[rows - n - 1] = 1;
-
+    //w=diff(ext);
+    //w=~logical([0; w(1:end-1)==0 & w(2:end)==0; 0]);
     for (int i = 1; i < rows - n; i++) {
         w[i - 1] = ext[i] - ext[i - 1];
     }
-//    for (int i = 1; i < rows - n - 1; i++) {
-//        if (w3[i - 1] == 0 && w3[i] == 0) {
-//            tmp2[i - 1] = 1;
-//            w4[i] = 0;
-//            m++;
-//        } else {
-//            tmp2[i - 1] = 0;
-//            w4[i] = 1;
-//        }
-//    }
 
     for (int i = rows - n - 2; i > 0; i--) {
         if (w[i - 1] == 0 && w[i] == 0) {
@@ -159,10 +126,7 @@ FLOAT *sig2ext(FLOAT *sigy, FLOAT *dty, int rows, int *lenOfArray) {
     }
     w[0] = w[rows - n - 1] = 1;
 
-
-
-    //ext2=ext1(w4); exttime2=exttime1(w4);
-    //FLOAT ext2[rows - n - m], exttime2[rows - n - m];
+    //ext=ext(w); exttime=exttime(w);
     for (int i = 0, j = 0; i < rows - n - m && j < rows - n;) {
         if (w[j] == 0) {
             j++;
@@ -174,10 +138,7 @@ FLOAT *sig2ext(FLOAT *sigy, FLOAT *dty, int rows, int *lenOfArray) {
         }
     }
 
-    //w5=~logical([0; ext2(1:end-1)==ext2(2:end)]);
-
-    //FLOAT w5[rows - n - m];
-    //w5[0] = 1;
+    //w=~logical([0; ext(1:end-1)==ext(2:end)]);
     for (int i = 1; i < rows - n - m; i++) {
         if (ext[i - 1] == ext[i]) {
             w[i] = 0;
@@ -188,9 +149,7 @@ FLOAT *sig2ext(FLOAT *sigy, FLOAT *dty, int rows, int *lenOfArray) {
     }
     w[0] = 1;
 
-    //ext3=ext2(w5);
-
-    //FLOAT ext3[rows - n - m - k];
+    //ext=ext(w);
     for (int i = 0, j = 0; i < rows - n - m - k && j < rows - n - m;) {
         if (w[j] == 0) {
             j++;
@@ -200,12 +159,9 @@ FLOAT *sig2ext(FLOAT *sigy, FLOAT *dty, int rows, int *lenOfArray) {
             j++;
         }
     }
-    //w6=(exttime2(2:end)-exttime2(1:end-1))./2
-    //exttime3=[exttime2(1:end-1)+w6.*~w5(2:end); exttime2(end)];
-    //exttime4=exttime3(w5);
-
-    //FLOAT w6[rows - n - m - 1], exttime3[rows - n - m], exttime4[rows - n - m - k];
-    //exttime3[rows - n - m - 1] = exttime2[rows - n - m - 1];
+    //w2=(exttime(2:end)-exttime(1:end-1))./2
+    //exttime=[exttime(1:end-1)+w2.*~w(2:end); exttime(end)];
+    //exttime=exttime(w);
 
     FLOAT *w2 = malloc((rows - n - m - 1) * sizeof(FLOAT));
     for (int i = 1; i < rows - n - m; i++) {
@@ -234,26 +190,14 @@ FLOAT *sig2ext(FLOAT *sigy, FLOAT *dty, int rows, int *lenOfArray) {
         }
     }
 
-    //length(ext3)>2,  w7=diff(ext3); w8=logical([1; w7(1:end-1).*w7(2:end)<0; 1]); ext4=ext3(w8); exttime5=exttime4(w8);
+    //length(ext)>2,  w=diff(ext); w=logical([1; w(1:end-1).*w(2:end)<0; 1]);
+    //ext4=ext(w); exttime=exttime(w);
     FLOAT *ext4 = NULL;
     *lenOfArray = 0;
     if (rows - n - m - k > 2) {
-
-        //FLOAT w7[rows - n - m - k - 1], w8[rows - n - m - k];
-        //w8[0] = 1;
-        //w8[rows - n - m - k - 1] = 1;
-
         for (int i = 1; i < rows - n - m - k; i++) {
             w[i - 1] = ext[i] - ext[i - 1];
         }
-//        for (int i = 1; i < rows - n - m - k - 1; i++) {
-//            if (w7[i - 1] * w7[i] < 0) {
-//                w8[i] = 1;
-//            } else {
-//                w8[i] = 0;
-//                l++;
-//            }
-//        }
 
         for (int i = rows - n - m - k - 2; i > 0; i--) {
             if (w[i - 1] * w[i] < 0) {
@@ -308,9 +252,7 @@ FLOAT **rainFlow(FLOAT *ext, FLOAT *exttime, int lenOfSig2ext, int *lenOfRainflo
 
     for (int i = 0; i < lenOfSig2ext; i++) {
         a[++j] = *(ext + pointId);
-        //printf("%.10f\n", *(ext + pointId));
         t[j] = *(exttime + pointId);
-        //printf("%.10f\n", *(exttime + pointId));
         while ((j >= 2) && (fabs(a[j - 1] - a[j - 2]) <= fabs(a[j] - a[j - 1]))) {
             ampl = fabs((a[j - 1] - a[j - 2]) / 2);
             switch (j) {
@@ -415,9 +357,6 @@ FLOAT *rfhist(FLOAT **rfy, int lenOfRainflow, int *lenOfRfhist) {
             halfcNum++;
     }
 
-//    printf("halfcNUM:\n");
-//    printf("%d\n", halfcNum);
-
     int *halfc = NULL;
     halfc = malloc(halfcNum * sizeof(int));
     for (int i = 0, j = 0; i < lenOfRainflow && j < halfcNum;) {
@@ -427,11 +366,6 @@ FLOAT *rfhist(FLOAT **rfy, int lenOfRainflow, int *lenOfRfhist) {
         }
         i++;
     }
-
-//    printf("halfc:\n");
-//    for (int i = 0; i < halfcNum; i++) {
-//        printf("%d\n", halfc[i]);
-//    }
 
     FLOAT min = rfy[0][0], max = rfy[0][0];
     for (int i = 0; i < lenOfRainflow; i++) {
@@ -447,11 +381,7 @@ FLOAT *rfhist(FLOAT **rfy, int lenOfRainflow, int *lenOfRfhist) {
         xoy[i] = min + (FLOAT) (i + 0.50) * wid;
     }
 
-
-    //printf("min data %.10f wid %.10f\n", min, wid);
     for (int i = 0; i < lenOfRainflow; i++) {
-        //printf("data rfy %.10f rfy-min %.10f rfy-min/wid %.10f floor %d\n",
-        //     rfy[0][i], rfy[0][i] - min, (rfy[0][i] - min) / wid, (int) floor((rfy[0][i] - min) / wid));
         int j;
         j = (int) floor((rfy[0][i] - min) / wid);
         if (j != 0 && fabs((rfy[0][i] - min) - wid * j) < 1e-10) {
@@ -461,15 +391,6 @@ FLOAT *rfhist(FLOAT **rfy, int lenOfRainflow, int *lenOfRfhist) {
         }
     }
 
-//    printf("noy:\n");
-//    for (int i = 0; i < x; i++) {
-//        printf("%f\n", noy[i]);
-//    }
-//    printf("xoy:\n");
-//    for (int i = 0; i < x; i++) {
-//        printf("%f\n", xoy[i]);
-//    }
-
     //if ~isempty(halfc) {
     //[N2 x]=hist(rf(r,halfc),x)  N2 = noy2, x = *xoy
     //N1=N1-0.5*N2  N1 = noy
@@ -478,11 +399,9 @@ FLOAT *rfhist(FLOAT **rfy, int lenOfRainflow, int *lenOfRfhist) {
         FLOAT *noy2 = malloc(x * sizeof(FLOAT));
         memset(noy2, 0, x * sizeof(FLOAT));
         FLOAT *rf = malloc(halfcNum * sizeof(FLOAT));
-        //printf("rf:\n");
         for (int i = 0; i < halfcNum; i++) {
             int j = halfc[i];
             rf[i] = rfy[0][j];
-            //  printf("%f\n", rf[i]);
         }
 
         for (int i = 0; i < halfcNum; i++) {
@@ -495,16 +414,11 @@ FLOAT *rfhist(FLOAT **rfy, int lenOfRainflow, int *lenOfRfhist) {
             }
         }
 
-//        printf("noy2:\n");
-//        for (int i = 0; i < x; i++) {
-//            printf("%f\n", noy2[i]);
-//        }
-
-        //printf("noy:\n");
         for (int i = 0; i < x; i++) {
             noy[i] -= noy2[i] * 0.5;
-            //    printf("%f\n", noy[i]);
         }
+
+        free(noy2);
         free(rf);
     }
 
@@ -515,6 +429,7 @@ FLOAT *rfhist(FLOAT **rfy, int lenOfRainflow, int *lenOfRfhist) {
     }
 
     free(halfc);
+    free(xoy);
     free(noy);
 
     return rfhist;
@@ -522,10 +437,7 @@ FLOAT *rfhist(FLOAT **rfy, int lenOfRainflow, int *lenOfRfhist) {
 
 //test preData
 void testPreData() {
-
-    //printf("*************************Dysum:***************************************\n");
     for (int kk = 0; kk < 9; kk++) {
-        //FLOAT sigy[aaaRow], dty[aaaRow];
         FLOAT *sigy = malloc(aaaRow * sizeof(FLOAT));
         FLOAT *dty = malloc(aaaRow * sizeof(FLOAT));
         for (int i = 0; i < aaaRow; i++) {
@@ -552,6 +464,8 @@ void testPreData() {
         }
         //printf("%e\n", Dysum[kk]);
 
+        free(sigy);
+        free(dty);
         free(ext);
         for (int i = 0; i < 5; i++) {
             free(rfy[i]);
@@ -639,7 +553,7 @@ void testPreData() {
 
 //fitness Function
 FLOAT fitnessFcn(FLOAT *x) {
-
+    //initial Dzsum in every generation
     memset(Dzsum, 0, sizeof(FLOAT) * 9);
 
     FLOAT **Tzb = NULL;
@@ -651,7 +565,6 @@ FLOAT fitnessFcn(FLOAT *x) {
 
     for (int i = 0; i < 9; i++) {
         for (int j = 0; j < aRow; j++) {
-            //Tzb(j,i)=x(1)*aa(1,i)*a(j,3)+x(2)*aa(2,i)*a(j,4)+x(3)*aa(3,i)*a(j,5)+x(4)*aa(4,i)*a(j,6)+x(5)*aa(5,i)*a(j,7)+x(6)*aa(6,i)*a(j,8)+x(7)*aa(7,i)*a(j,9)+x(8)*aa(8,i)*a(j,10)+x(9)*aa(9,i)*a(j,11)+x(10)*aa(10,i)*a(j,12);
             Tzb[j][i] = x[0] * aa[0][i] * a[j][2] + x[1] * aa[1][i] * a[j][3] + x[2] * aa[2][i] * a[j][4] +
                         x[3] * aa[3][i] * a[j][5] + x[4] * aa[4][i] * a[j][6] + x[5] * aa[5][i] * a[j][7] +
                         x[6] * aa[6][i] * a[j][8] + x[7] * aa[7][i] * a[j][9] + x[8] * aa[8][i] * a[j][10] +
@@ -660,8 +573,6 @@ FLOAT fitnessFcn(FLOAT *x) {
     }
 
     for (int k = 0; k < 9; k++) {
-
-        //FLOAT sig[aRow], dt[aRow];
         FLOAT *sig = malloc(aRow * sizeof(FLOAT));
         FLOAT *dt = malloc(aRow * sizeof(FLOAT));
         for (int i = 0; i < aRow; i++) {
@@ -688,6 +599,8 @@ FLOAT fitnessFcn(FLOAT *x) {
         }
         //printf("%e\n", Dzsum[k]);
 
+        free(sig);
+        free(dt);
         free(ext);
         for (int i = 0; i < 5; i++) {
             free(rf[i]);
@@ -707,7 +620,7 @@ FLOAT fitnessFcn(FLOAT *x) {
         }
     }
 
-    for (int i = 0; i < 9; i++) {
+    for (int i = 0; i < aRow; i++) {
         free(Tzb[i]);
     }
     free(Tzb);
@@ -724,18 +637,11 @@ void initialPopulation() {
             high_pos = (high_pos & ((1 << 15) - 1));
             int value = low_pos + (high_pos << 16);
             populationArray[i][j] = (UB[j] - LB[j]) * ((FLOAT) value / ((1U << 31) - 1)) + LB[j];
-//            printf("high %d low %d %d / %d\n", high_pos, low_pos, value, (1U << 31) - 1);
         }
         FLOAT tmp_fit = fitnessFcn(populationArray[i]);
         if (tmp_fit > 99) {
             i--;
         }
-//        else {
-//            for (int j = 0; j < chromosomeSize; j++) {
-//                printf("%f,", populationArray[i][j]);
-//            }
-//            printf("%e\n", tmp_fit);
-//        }
     }
 }
 
@@ -937,10 +843,6 @@ int main(int argc, char *argv[]) {
         return 0;
     }
 
-    //FLOAT x[10] = {0.721442,2.011512,3.811585,1.052325,1.571934,1.063318,3.603349,2.452343,3.628507,2.900026};
-
-
-
     //calculate Dysum
     testPreData();
 
@@ -985,6 +887,8 @@ int main(int argc, char *argv[]) {
             }
             G = i + 1;
         }
+
+        free(bestRes);
 
         if (i == maxGeneration - 1) break;
 
