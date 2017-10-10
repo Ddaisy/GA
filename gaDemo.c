@@ -844,20 +844,30 @@ int main(int argc, char *argv[]) {
     }
 
     //calculate Dysum
+    time_t start_Dy = clock();
     testPreData();
+    time_t stop_Dy = clock();
+    printf("Dyzum:%e\n", ((FLOAT) (stop_Dy - start_Dy)) / CLOCKS_PER_SEC);
 
     //initial population
+    time_t start_i = clock();
     initialPopulation();
+    time_t stop_i = clock();
+    printf("initial:%e\n", ((FLOAT) (stop_i - start_i)) / CLOCKS_PER_SEC);
 
     fval = 100;
 
     //start GA
-    for (int i = 0; i < maxGeneration; i++) {
+    //for (int i = 0; i < maxGeneration; i++) {
 
         //calculate fitness of every population
+        time_t start_f = clock();
         for (int j = 0; j < populationSize; j++) {
             fitness[j] = fitnessFcn(populationArray[j]);
+            printf("%e\n", fitness[j]);
         }
+        time_t stop_f = clock();
+        printf("fitness:%e\n", ((FLOAT) (stop_f - start_f)) / CLOCKS_PER_SEC);
 
 //        if (i % 100 == 0) {
 //            printf("epoch %d :\n", i);
@@ -871,7 +881,7 @@ int main(int argc, char *argv[]) {
 
         //每一代平均适应度
         FLOAT sumFit = sum(fitness);
-        aveFitnessOfGen[i] = sumFit / populationSize;
+        //aveFitnessOfGen[i] = sumFit / populationSize;
 
         //每一代最优适应度及其位置
         //bestRes[bestFitness][bestIndex]
@@ -885,20 +895,33 @@ int main(int argc, char *argv[]) {
             for (int k = 0; k < chromosomeSize; k++) {
                 X_10[k] = populationArray[bestIndexOfGen][k];
             }
-            G = i + 1;
+            //G = i + 1;
         }
 
         free(bestRes);
 
-        if (i == maxGeneration - 1) break;
+        //if (i == maxGeneration - 1) break;
 
         //select
+        time_t start_s = clock();
         selectFcn();
+        time_t stop_s = clock();
+        printf("select:%e\n", ((FLOAT) (stop_s - start_s)) / CLOCKS_PER_SEC);
+
+
         //cross
+        time_t start_c = clock();
         crossFcn();
+        time_t stop_c = clock();
+        printf("cross:%e\n", ((FLOAT) (stop_c - start_c)) / CLOCKS_PER_SEC);
+
+
         //mutation
+        time_t start_m = clock();
         mutationFcn();
-    }
+        time_t stop_m = clock();
+        printf("mutation:%e\n", ((FLOAT) (stop_m - start_m)) / CLOCKS_PER_SEC);
+    //}
 
     freeMatrix(a, aRow);
     freeMatrix(aa, 10);
@@ -911,7 +934,7 @@ int main(int argc, char *argv[]) {
     printf("X:%f, %f, %f, %f, %f, %f, %f, %f, %f, %f\n", X_10[0], X_10[1], X_10[2], X_10[3], X_10[4], X_10[5], X_10[6],
            X_10[7], X_10[8], X_10[9]);
     printf("Gen:%d\n", G);
-    printf("%.2f\n", time);
+    printf("%e\n", time);
 
     return 0;
 }
