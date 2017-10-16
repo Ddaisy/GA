@@ -768,13 +768,16 @@ void crossFcn() {
     for (int i = 0; i < populationSize; i += 2) {
         //判断当前两个个体是否做交叉
         FLOAT pick1 = ((FLOAT) rand()) / RAND_MAX;
-        if (pick1 > crossRate)
+        if (pick1 < crossRate)
             continue;
+
+        //printf("cross : %f\n", pick1);
 
         for (int j = 0; j < chromosomeSize; j++) {
             //判断两个个体中的染色体是否做交叉
             int pick2 = rand();
             if (pick2 & 1) {
+                //printf("chroCross : %d\n", pick2);
                 FLOAT tmp = populationArray[i][j];
                 populationArray[i][j] = populationArray[i + 1][j];
                 populationArray[i + 1][j] = tmp;
@@ -791,13 +794,16 @@ void mutationFcn() {
 
         //判断当前个体是否变异
         FLOAT pick1 = ((FLOAT) rand()) / RAND_MAX;
-        if (pick1 > mutationRate)
+        if (pick1 < mutationRate)
             continue;
+
+        //printf("mutation : %f\n", pick1);
 
         for (int j = 0; j < chromosomeSize; j++) {
             //判断当前染色体是否变异
             int pick2 = rand();
             if (pick2 & 1) {
+                //printf("mutationChro : %d\n", pick2);
                 FLOAT tmpChromosome;
                 do {
                     FLOAT pick3 = ((FLOAT) rand()) / RAND_MAX * 2 - 1;
@@ -858,26 +864,13 @@ int main(int argc, char *argv[]) {
     fval = 100;
 
     //start GA
-    //for (int i = 0; i < maxGeneration; i++) {
+    for (int i = 0; i < maxGeneration; i++) {
 
         //calculate fitness of every population
-        time_t start_f = clock();
         for (int j = 0; j < populationSize; j++) {
             fitness[j] = fitnessFcn(populationArray[j]);
-            printf("%e\n", fitness[j]);
-        }
-        time_t stop_f = clock();
-        printf("fitness:%e\n", ((FLOAT) (stop_f - start_f)) / CLOCKS_PER_SEC);
 
-//        if (i % 100 == 0) {
-//            printf("epoch %d :\n", i);
-//            for (int m = 0; m < populationSize; m++) {
-//                for (int n = 0; n < chromosomeSize; n++) {
-//                    printf("%f,", populationArray[m][n]);
-//                }
-//                printf("%e\n", fitness[m]);
-//            }
-//        }
+        }
 
         //每一代平均适应度
         FLOAT sumFit = sum(fitness);
@@ -895,33 +888,23 @@ int main(int argc, char *argv[]) {
             for (int k = 0; k < chromosomeSize; k++) {
                 X_10[k] = populationArray[bestIndexOfGen][k];
             }
-            //G = i + 1;
+            G = i + 1;
         }
 
         free(bestRes);
 
-        //if (i == maxGeneration - 1) break;
+        if (i == maxGeneration - 1) break;
 
         //select
-        time_t start_s = clock();
-        selectFcn();
-        time_t stop_s = clock();
-        printf("select:%e\n", ((FLOAT) (stop_s - start_s)) / CLOCKS_PER_SEC);
 
+        selectFcn();
 
         //cross
-        time_t start_c = clock();
         crossFcn();
-        time_t stop_c = clock();
-        printf("cross:%e\n", ((FLOAT) (stop_c - start_c)) / CLOCKS_PER_SEC);
-
 
         //mutation
-        time_t start_m = clock();
         mutationFcn();
-        time_t stop_m = clock();
-        printf("mutation:%e\n", ((FLOAT) (stop_m - start_m)) / CLOCKS_PER_SEC);
-    //}
+    }
 
     freeMatrix(a, aRow);
     freeMatrix(aa, 10);

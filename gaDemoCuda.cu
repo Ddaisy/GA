@@ -38,14 +38,11 @@ __device__ float *c_aaa; //Tyingli
 __device__ int c_aRow;
 __device__ int c_aaaRow;
 __device__ float c_Dysum[9];
-// float Dzsum[9];
-// float populationArray[populationSize][chromosomeSize];  //种群数组
-// float fitness[populationSize]; //每个种群的适应度
-// float populationPro[populationSize]; //每个种群在select时被选中的概率
+
 float bestFitnessOfGen; //每一代的最优适应度
 int bestIndexOfGen; //每一代的最优适应度位置
 float aveFitnessOfGen[maxGeneration]; //每一代的平均最优适应度
-float X_10[chromosomeSize]; //最优适应度对应的x值
+
 float fval; //最终最优适应度
 int G; //取得最终最优适应度的迭代次数
 //BOOL elitism = TRUE; //是否精英选择
@@ -53,6 +50,12 @@ int G; //取得最终最优适应度的迭代次数
 float *createMatrix(int rows, int cols) {
     float *matrix = (float*)malloc(rows * cols * sizeof(float));
     return matrix;
+}
+
+
+__global__ void initSeed(unsigned int seed, curandState_t* states) {
+    int idx = threadIdx.x;
+    curand_init(seed, idx, 0, &states[idx]);
 }
 
 //Get data from files
@@ -660,60 +663,53 @@ float *bestFitness(float *fitness) {
     return bestRes;
 }
 
-//select function 轮盘选择
-__global__ void selectFcn(float *populationArray, float *fitness, float *populationPro, curandState_t *states) {
-    printf("selectFcn\n");
+//select pre
+__global__ void selectPre(float *fitness, float *Fitness, float *tmpFitness, float *populationArray, float *tmpPopulationArray){
     int idx = threadIdx.x;
-
-    float *tmpPopulationArray = (float*)malloc(populationSize * chromosomeSize * sizeof(float));
-    float *tmpFitness = (float*)malloc(populationSize * sizeof(float));
-
-    for(int j = 0; j < chromosomeSize; j++){
-        populationArray[idx * chromosomeSize + j] = tmpPopulationArray[idx * chromosomeSize + j];
-    }
+    Fitness[idx] = 1 / fitness[idx];
     __syncthreads();
     tmpFitness[idx] = fitness[idx];
     __syncthreads();
+    for(int i = 0; i < chromosomeSize; i++){
+        tmpPopulationArray[idx * chromosomeSize + i] = populationArray[idx * chromosomeSize + i];
+    }
+    __syncthreads();
+}
+
+//select function 轮盘选择
+__global__ void selectFcn(float *populationArray, float *tmpPopulationArray, float *fitness, float *Fitness, float *tmpFitness, float sumFitness, float *populationPro, curandState_t *states) {
+    //printf("selectFcn\n");
+    int idx = threadIdx.x;
 
     //每个个体被选择的概率
-    float *Fitness = (float*)malloc(populationSize * sizeof(float));
-    float sumFitness = 0;
-
-    Fitness[idx] = 1 / fitness[idx];
-    __syncthreads();
-
-    sumFitness = sum(Fitness);
     populationPro[idx] = Fitness[idx] / sumFitness;
     __syncthreads();
-    free(Fitness);
 
     //轮盘选择
-    int *index = (int*)malloc(populationSize * sizeof(int));
-
-        float ss;
-        ss = curand_uniform(states);
+    int index;
+        curandState_t s;
+        s = states[idx];
+        float ss = curand_uniform(&s);
         while (ss < 0.0001)
-            ss = curand_uniform(states);
-
-            printf("%e\n", ss);
+            ss = curand_uniform(&s);
+            //printf("%e\n", ss);
 
         for (int j = 0; j < populationSize; j++) {
             ss -= populationPro[j];
             if (ss <= 0) {
-                index[idx] = j;
-                //printf("%d\n", index[idx]);
+                index = j;
+                //printf("%d\n", index);
                 break;
             }
         }
 
     //产生新种群
     for (int j = 0; j < chromosomeSize; j++) {
-        populationArray[idx * chromosomeSize + j] = tmpPopulationArray[index[idx] * chromosomeSize + j];
+        populationArray[idx * chromosomeSize + j] = tmpPopulationArray[index * chromosomeSize + j];
     }
-    fitness[idx] = tmpFitness[index[idx]];
-    free(index);
-    free(tmpPopulationArray);
-    free(tmpFitness);
+    __syncthreads();
+    fitness[idx] = tmpFitness[index];
+    __syncthreads();
 }
 
 //cross function 每两个个体做判断
@@ -721,16 +717,17 @@ __global__ void crossFcn(float *populationArray, curandState_t *states) {
     //printf("crossFcn\n");
 
     int idx = threadIdx.x;
-        //判断当前两个个体是否做交叉
+    curandState_t s = states[idx];
+    curandState_t t = states[idx];
+    float ss = curand_uniform(&s);
+    int tt = curand(&t);
 
-    //float pick1 = curand_uniform(states);
-    if (curand_uniform(states) > crossRate){
-        //printf("%d\n", idx);
-                   // continue;
+
+    //判断当前两个个体是否做交叉
+    if (ss < crossRate){
        for (int j = 0; j < chromosomeSize; j++) {
         //判断两个个体中的染色体是否做交叉
-            //int pick2 = curand(states);
-            if (curand(states) % 2 != 0) {
+            if (tt % 2 != 0) {
                 float tmp = populationArray[idx * chromosomeSize + j];
                 populationArray[idx * chromosomeSize + j] = populationArray[(idx + populationSize/2) * chromosomeSize + j];
                 populationArray[(idx + populationSize/2) * chromosomeSize + j] = tmp;
@@ -743,20 +740,22 @@ __global__ void crossFcn(float *populationArray, curandState_t *states) {
 __global__ void mutationFcn(float *populationArray, curandState_t *states) {
     //printf("mutationFcn\n");
     int idx = threadIdx.x;
+    curandState_t s = states[idx];
+    curandState_t t = states[idx];
+    float ss = curand_uniform(&s);
+    int tt = curand(&t);
+
     float scale = 0.5, shrink = 0.75;
     scale -= scale * shrink * idx / maxGeneration;
 
     //判断当前个体是否变异
-    //float pick1 = ((float) rand()) / RAND_MAX;
-    if (curand_uniform(states) > mutationRate){
+    if (ss < mutationRate){
         for (int j = 0; j < chromosomeSize; j++) {
             //判断当前染色体是否变异
-            //int pick2 = rand();
-            if (curand(states) %2 != 0) {
+            if (tt % 2 != 0) {
                 float tmpChromosome;
                 do {
-                    //float pick3 = curand_normal(states);
-                    tmpChromosome = populationArray[idx * chromosomeSize + j] + scale * (c_UB[j] - c_LB[j]) * curand_normal(states);
+                    tmpChromosome = populationArray[idx * chromosomeSize + j] + scale * (c_UB[j] - c_LB[j]) * ss;
                     //判断是否越界
                 } while (tmpChromosome > c_UB[j] || tmpChromosome < c_LB[j]);
                 populationArray[idx * chromosomeSize + j] = tmpChromosome;
@@ -942,12 +941,14 @@ int main(int argc, char *argv[]){
     cudaMemcpyToSymbol(c_LB, LB, 10 * sizeof(float));
     cudaMemcpyToSymbol(c_UB, UB, 10 * sizeof(float));
     cudaMemcpyToSymbol(c_Dysum, Dysum, 9 * sizeof(float));
-    //cudaMemcpyToSymbol(s, &states, sizeof(curandState_t));
 
     
     float *populationArray;
     float *fitness;
     float *populationPro;
+    float *Fitness;
+    float *tmpPopulationArray;
+    float *tmpFitness;
     float *X_10;
     fval = 100;
     //BOOL elitism = TRUE;
@@ -955,26 +956,32 @@ int main(int argc, char *argv[]){
     cudaMallocManaged(&populationArray, populationSize * chromosomeSize * sizeof(float));
     cudaMallocManaged(&fitness, populationSize * sizeof(float));
     cudaMallocManaged(&populationPro, populationSize * sizeof(float));
+    cudaMallocManaged(&Fitness, populationSize * sizeof(float));
+    cudaMallocManaged(&tmpPopulationArray, populationSize * chromosomeSize * sizeof(float));
+    cudaMallocManaged(&tmpFitness, populationSize * sizeof(float));
     cudaMallocManaged(&X_10, 10 * sizeof(float));
 
-
-    //cudaMemset(Dzsum, 0, 9 * sizeof(float));
     cudaMemset(populationArray, 0, populationSize * chromosomeSize * sizeof(float));
     cudaMemset(fitness, 0, populationSize * sizeof(float));
     cudaMemset(populationPro, 0, populationSize * sizeof(float));
+    cudaMemset(Fitness, 0, populationSize * sizeof(float));
+    cudaMemset(tmpPopulationArray, 0, populationSize * chromosomeSize * sizeof(float));
+    cudaMemset(tmpFitness, 0, populationSize * sizeof(float));
     cudaMemset(X_10, 0, 10 * sizeof(float));
 
 
     curandState_t *states = NULL;
-    cudaMalloc((void**) &states, sizeof(curandState_t));
+    cudaMalloc((void**)&states, populationSize * sizeof(curandState_t));
+
+
+
+    initSeed<<<1, populationSize>>>(time(NULL), states);
+    cudaDeviceSynchronize();
 
     //initial population
     initial(populationArray);
 
     for(int n = 0; n < maxGeneration; n++){
-        //fitness function
-        //GfitnessFcn<<<100, 1>>>(populationArray, fitness);
-        //cudaDeviceSynchronize();
 
         for (int i = 0; i < populationSize; i++) {
             float *x = (float*)malloc(chromosomeSize * sizeof(float));
@@ -982,14 +989,9 @@ int main(int argc, char *argv[]){
                 x[j] = populationArray[i * chromosomeSize + j];
             }
             fitness[i] = HfitnessFcn(x);
-            //printf("%e\n", fitness[i]);
             free(x);
         }
 
-        //bestFitness
-        //每一代平均适应度
-        // float sumFit = sum(fitness);
-        // aveFitnessOfGen[0] = sumFit / populationSize;
 
         //每一代最优适应度及其位置
         //bestRes[bestFitness][bestIndex]
@@ -1004,41 +1006,32 @@ int main(int argc, char *argv[]){
             }
             G = n + 1;
         }
+        // printf("1bestFitness : %e\n", bestFitnessOfGen);
+        // printf("1fval : %e\n", fval);
         
-        printf("%e\n", bestFitnessOfGen);
+        //printf("%e\n", bestFitnessOfGen);
         //printf("%d\n", bestIndexOfGen);
 
         free(bestRes);
         if(G == maxGeneration - 1) break;
 
 
-        // selectFcn<<<1, populationSize>>>(populationArray, fitness, populationPro, states);
-        // cudaDeviceSynchronize();
-        selectFcn(populationArray, fitness, populationPro);
-        // printf("1111111111111111111111111111111111111111111\n");
-        // for(int i = 0; i < populationSize; i++){
-        //     printf("%e\n", fitness[i]);
-        // }
+        selectPre<<<1, populationSize>>>(fitness, Fitness, tmpFitness, populationArray, tmpPopulationArray);
+        cudaDeviceSynchronize();
 
-        //printf("11111111111111111111\n");
+        float sumFitness = sum(Fitness);
 
-        // crossFcn<<<1, populationSize/2>>>(populationArray, states);    
-        // cudaDeviceSynchronize();
-        // printf("222222222222222222222222222222222222222222222222\n");
-        // for(int i = 0; i < populationSize; i++){
-        //     printf("%e\n", fitness[i]);
-        // }
-        crossFcn(populationArray);
-        //printf("22222222222222222222\n");
+        selectFcn<<<1, populationSize>>>(populationArray, tmpPopulationArray, fitness, Fitness, tmpFitness, sumFitness, populationPro, states);
+        cudaDeviceSynchronize();
+        //selectFcn(populationArray, fitness, populationPro);
 
-        // mutationFcn<<<1, populationSize>>>(populationArray, states);
-        // cudaDeviceSynchronize();
-        // printf("333333333333333333333333333333333333333333333\n");
-        // for(int i = 0; i < populationSize; i++){
-        //     printf("%e\n", fitness[i]);
-        // }
-        mutationFcn(populationArray);
-        //printf("33333333333333333333\n");
+        crossFcn<<<1, populationSize/2>>>(populationArray, states);    
+        cudaDeviceSynchronize();
+        //crossFcn(populationArray);
+
+        mutationFcn<<<1, populationSize>>>(populationArray, states);
+        cudaDeviceSynchronize();
+        //mutationFcn(populationArray);
 
     }
 
@@ -1058,6 +1051,9 @@ int main(int argc, char *argv[]){
     cudaFree(populationArray);
     cudaFree(fitness);
     cudaFree(populationPro);
+    cudaFree(Fitness);
+    cudaFree(tmpPopulationArray);
+    cudaFree(tmpFitness);
     cudaFree(X_10);
     cudaFree(states);
 
